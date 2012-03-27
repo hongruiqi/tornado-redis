@@ -57,7 +57,7 @@ class RedisClient(object):
             if pool:
                 return pool.popleft()  # 从连接池中取出一条连接
         else:
-            self._connection_pool = deque() # 地址不存在时新建
+            self._connection_pool[address] = deque() # 地址不存在时新建
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
         self._stream = iostream.IOStream(s)
         self._stream.connect(address, self._on_connect)
