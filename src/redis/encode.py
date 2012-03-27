@@ -1,3 +1,4 @@
+# -*- coding:utf-8 -*-
 def encode(cmd):
     assert isinstance(cmd, (tuple, list)), "cmd to be encoded should be of type tuple or list"
     lines = []

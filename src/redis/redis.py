@@ -1,3 +1,4 @@
+# -*- coding:utf-8 -*-
 import socket
 from collections import deque
 from functools import partial
