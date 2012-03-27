@@ -4,8 +4,7 @@ tornado-redis
 An redis client for tornado.
 
 example:
-```python
+
     from redis import RedisClient
     client = RedisClient()
     client.execute(["set", "foo", "bar"])
-```
