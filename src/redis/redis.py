@@ -11,7 +11,7 @@ import time
 
 class RedisError(Exception): pass
 
-class RedisClient(object):
+class Client(object):
     """RedisClient
 
     * 管理连接池.
@@ -28,7 +28,7 @@ class RedisClient(object):
         self.address = (ip, port)
         self._stream = None
         self._connecting = False
-        self._pending_cmd = deque()
+        self._cmd_queue = deque()
         self._running = None
         self._callback = None
         self._decoder = None
@@ -40,13 +40,14 @@ class RedisClient(object):
 
     def close(self):
         self._closed = True
-        stream = self._stream
         def release_stream():
-            if self._running or len(self._pending_cmd)>0:
+            if self._running or len(self._cmd_queue)>0:
                 ioloop.IOLoop.instance().add_callback(release_stream)
             else:
-                address = stream.socket.getpeername()
-                self._connection_pool[address].append(stream)
+                self._stream = None
+                address = self.stream.socket.getpeername()
+                self._connection_pool[address].append(self.stream)
+        release_stream()
 
     def connect(self):
         address = self.address
@@ -79,9 +80,9 @@ class RedisClient(object):
             self.connect()
             return
 
-        if not self._running and not self._connecting and len(self._pending_cmd)>0:
+        if not self._running and not self._connecting and len(self._cmd_queue)>0:
             self._running = True
-            cmd, self._callback = self._pending_cmd.popleft()
+            cmd, self._callback = self._cmd_queue.popleft()
             self._decoder = False
             self.stream.write(encode(cmd))
             self.stream.read_until("\r\n", self._on_read_response)
@@ -102,12 +103,55 @@ class RedisClient(object):
             t = g.send(data[:-2])
         if isinstance(t, Reply):
             self._callback(Reply)
-            self._run()
+            self._on_response_finish()
         else:
             self.stream.read_until("\r\n", self.on_read_response)
+    
+    def _on_response_finish(self):
+        self._running = False
+        self._run()
 
     def run(self, cmd, callback=None):
         if self._closed:
             raise RedisError("client has been closed")
-        self._pending_cmd.append((cmd, callback))
+        self._cmd_queue.append((cmd, callback))
         self._run()
+        
+class PipeLine(Client):    
+    def __init__(self, ip="127.0.0.1", port=6379):
+        self.address = (ip, port)
+        self._stream = None
+        self._connecting = False
+        self._cmd_queue = None
+        self._pending_cmd_queues = deque()
+        self._pending_cmd_queue = deque()
+        self._running = None
+        self._callback = None
+        self._decoder = None
+        self._closed = False
+    
+    def append(self):
+        if self._closed:
+            raise RedisError("client has been closed")
+        self._pending_cmd_queue.append((cmd, callback))
+    
+    def run(self):
+        self._pending_cmd_queues.append(self._pending_cmd_queue)
+        self._run_queue()
+        
+    def _run_queue(self):
+        if self._running or len(self,_cmd_queue)>0:
+            return
+        if len(self._pending_cmd_queues)>0:
+            self._cmd_queue = self.pending_cmd_queues.popleft()
+            self._run()
+    
+    def _on_response_finish(self):
+        self._running = False
+        if len(self._cmd_queues)==0:
+            self._run_queue()
+            return
+        self._run()
+        
+    # TODO: close 函数是否需要修改？
+        
